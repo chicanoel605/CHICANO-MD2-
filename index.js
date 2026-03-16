@@ -1,177 +1,191 @@
 /**
  * CHICANO MD - WhatsApp Bot pour Katabump
- * Version 3.0.0 - Mode Console Directe
- * Le code de paire apparaît directement dans les logs Katabump
+ * Version TESTÉE et CORRIGÉE
  */
 
-require('dotenv').config();
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+// Charger les modules
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
-const path = require('path');
 const chalk = require('chalk');
 
 // Configuration
-const config = {
-    botName: process.env.BOT_NAME || 'CHICANO MD',
-    ownerName: process.env.OWNER_NAME || 'EL CHICANO',
-    ownerNumber: process.env.OWNER_NUMBER || '22600000000',
-    version: '3.0.0',
-    prefix: process.env.PREFIX || '.',
-    pairingMode: true,
-    pairPhoneNumber: process.env.PAIR_PHONE_NUMBER || '' // IMPORTANT: À remplir dans les variables Katabump
-};
+const PREFIX = '.';
+const BOT_NAME = 'CHICANO MD';
+const OWNER = 'EL CHICANO';
 
-// Variables globales
-let sock = null;
-let startTime = Date.now();
+// TON NUMÉRO ICI (modifie cette ligne)
+const PAIR_PHONE_NUMBER = '2250152611661'; // Mets ton numéro ici
 
-// Créer les dossiers nécessaires
-if (!fs.existsSync('session')) fs.mkdirSync('session', { recursive: true });
-if (!fs.existsSync('temp')) fs.mkdirSync('temp', { recursive: true });
-
-// Charger les commandes (optionnel - tu peux ajouter tes commandes ici)
-const commands = new Map();
-
-// Afficher la bannière de démarrage
 console.log(chalk.green('╔════════════════════════════════════╗'));
 console.log(chalk.green('║         CHICANO MD v3.0           ║'));
 console.log(chalk.green('╠════════════════════════════════════╣'));
-console.log(chalk.green(`║ Propriétaire: ${config.ownerName}`));
-console.log(chalk.green(`║ Préfixe: ${config.prefix}`));
-console.log(chalk.green(`║ Mode: PAIRING CODE`));
-console.log(chalk.green(`║ Numéro: ${config.pairPhoneNumber || 'NON DÉFINI'}`));
+console.log(chalk.green(`║ Propriétaire: ${OWNER}`));
+console.log(chalk.green(`║ Numéro: ${PAIR_PHONE_NUMBER}`));
 console.log(chalk.green('╚════════════════════════════════════╝'));
 console.log('');
+
+// Créer le dossier session
+if (!fs.existsSync('./session')) {
+    fs.mkdirSync('./session', { recursive: true });
+}
+
+// Variable pour le bot
+let sock = null;
 
 // Fonction principale
 async function startBot() {
     try {
         console.log(chalk.blue('🚀 Démarrage du bot...'));
-        
-        const { state, saveCreds } = await useMultiFileAuthState('session');
-        const { version } = await fetchLatestBaileysVersion();
 
+        // Charger la session
+        const { state, saveCreds } = await useMultiFileAuthState('./session');
+
+        // Créer la connexion
         sock = makeWASocket({
-            version,
             auth: state,
-            logger: pino({ level: 'silent' }),
             printQRInTerminal: false, // Pas de QR
-            browser: ['CHICANO MD', 'Safari', config.version]
+            logger: pino({ level: 'silent' }),
+            browser: ['CHICANO MD', 'Chrome', '3.0.0'],
+            syncFullHistory: false,
+            markOnlineOnConnect: true
         });
 
-        // Sauvegarde des credentials
+        // Sauvegarder les credentials
         sock.ev.on('creds.update', saveCreds);
 
-        // Gestion connexion
+        // Gérer la connexion
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect } = update;
-            
+
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log(chalk.red(`❌ Connexion fermée, reconnexion dans 5s...`));
-                
+                const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+                console.log(chalk.red('❌ Connexion fermée, reconnexion...'));
                 if (shouldReconnect) {
                     setTimeout(startBot, 5000);
                 }
             } else if (connection === 'open') {
-                console.log(chalk.green('\n✅✅✅ BOT CONNECTÉ AVEC SUCCÈS ✅✅✅'));
-                console.log(chalk.green(`📱 Connecté en tant que: ${sock.user.id}`));
+                console.log(chalk.green('\n✅ BOT CONNECTÉ AVEC SUCCÈS !'));
+                console.log(chalk.green(`📱 WhatsApp: ${sock.user?.id || 'Inconnu'}`));
                 console.log('');
             }
         });
 
-        // Attendre que la connexion soit prête
+        // Attendre que le bot soit prêt
         setTimeout(async () => {
-            if (config.pairingMode && config.pairPhoneNumber) {
-                try {
-                    console.log(chalk.yellow('\n📱 GÉNÉRATION DU CODE DE PAIRAGE...'));
-                    console.log(chalk.yellow('═'.repeat(50)));
-                    
-                    // Générer le code
-                    const code = await sock.requestPairingCode(config.pairPhoneNumber);
-                    const formattedCode = code.match(/.{1,4}/g).join('-');
-                    
-                    // AFFICHAGE TRÈS VISIBLE DU CODE
-                    console.log('');
-                    console.log(chalk.bgGreen.black('══════════════════════════════════════════'));
-                    console.log(chalk.bgGreen.black('                                          '));
-                    console.log(chalk.bgGreen.black('   🔑 CODE DE PAIRAGE WHATSAPP 🔑        '));
-                    console.log(chalk.bgGreen.black('                                          '));
-                    console.log(chalk.bgGreen.black(`   📱 NUMÉRO: ${config.pairPhoneNumber}     `));
-                    console.log(chalk.bgGreen.black('                                          '));
-                    console.log(chalk.bgGreen.black(`   🎯 CODE: ${formattedCode}           `));
-                    console.log(chalk.bgGreen.black('                                          '));
-                    console.log(chalk.bgGreen.black('   ⚡ ENTRE CE CODE DANS WHATSAPP        '));
-                    console.log(chalk.bgGreen.black('   📲 Menu > Appareils connectés         '));
-                    console.log(chalk.bgGreen.black('                                          '));
-                    console.log(chalk.bgGreen.black('══════════════════════════════════════════'));
-                    console.log('');
-                    
-                    // Aussi en blanc simple pour les logs
-                    console.log('🔑 CODE DE PAIRAGE:', formattedCode);
-                    console.log('📱 À entrer dans WhatsApp -> Appareils connectés');
-                    console.log('');
-                    
-                } catch (e) {
-                    console.log(chalk.red('❌ Erreur génération code:'), e.message);
-                    console.log(chalk.yellow('Vérifie que le numéro est correct:'), config.pairPhoneNumber);
+            try {
+                console.log(chalk.yellow('\n📱 GÉNÉRATION DU CODE DE PAIRAGE...'));
+                
+                // Vérifier que le socket est défini
+                if (!sock) {
+                    console.log(chalk.red('❌ Socket non initialisé'));
+                    return;
                 }
-            } else {
-                console.log(chalk.red('❌ NUMÉRO NON CONFIGURÉ'));
-                console.log(chalk.yellow('Ajoute PAIR_PHONE_NUMBER dans les variables Katabump'));
-            }
-        }, 5000);
 
-        // Gestion des messages (optionnel - pour les commandes)
+                // Demander le code de pairage
+                console.log(chalk.blue(`📞 Numéro: ${PAIR_PHONE_NUMBER}`));
+                
+                const code = await sock.requestPairingCode(PAIR_PHONE_NUMBER);
+                
+                // Formater le code (ABCD-EFGH-IJKL)
+                const formattedCode = code.match(/.{1,4}/g)?.join('-') || code;
+                
+                // AFFICHAGE TRÈS VISIBLE
+                console.log('');
+                console.log(chalk.bgGreen.black('══════════════════════════════════════════'));
+                console.log(chalk.bgGreen.black('                                          '));
+                console.log(chalk.bgGreen.black('   🔑 CODE DE PAIRAGE WHATSAPP 🔑        '));
+                console.log(chalk.bgGreen.black('                                          '));
+                console.log(chalk.bgGreen.black(`   📱 NUMÉRO: ${PAIR_PHONE_NUMBER}`));
+                console.log(chalk.bgGreen.black('                                          '));
+                console.log(chalk.bgGreen.black(`   🎯 CODE: ${formattedCode}`));
+                console.log(chalk.bgGreen.black('                                          '));
+                console.log(chalk.bgGreen.black('   ⚡ INSTRUCTIONS :'));
+                console.log(chalk.bgGreen.black('   1. Ouvrir WhatsApp sur ton téléphone'));
+                console.log(chalk.bgGreen.black('   2. Menu → Appareils connectés'));
+                console.log(chalk.bgGreen.black('   3. Cliquer sur "Connecter un appareil"'));
+                console.log(chalk.bgGreen.black('   4. Entrer CE code'));
+                console.log(chalk.bgGreen.black('                                          '));
+                console.log(chalk.bgGreen.black('══════════════════════════════════════════'));
+                console.log('');
+
+                // Sauvegarder dans un fichier
+                fs.writeFileSync('./code.txt', 
+                    `Code: ${formattedCode}\nNuméro: ${PAIR_PHONE_NUMBER}\nDate: ${new Date().toLocaleString()}`
+                );
+                console.log(chalk.green('✅ Code sauvegardé dans code.txt'));
+
+            } catch (error) {
+                console.log(chalk.red('\n❌ ERREUR DE GÉNÉRATION DU CODE:'));
+                console.log(chalk.red(error.message));
+                console.log('');
+                console.log(chalk.yellow('📋 DIAGNOSTIC:'));
+                console.log(chalk.yellow(`- Numéro: ${PAIR_PHONE_NUMBER}`));
+                console.log(chalk.yellow(`- Longueur: ${PAIR_PHONE_NUMBER.length} chiffres`));
+                console.log(chalk.yellow(`- Heure: ${new Date().toLocaleString()}`));
+                console.log('');
+                console.log(chalk.yellow('🔧 SOLUTIONS POSSIBLES:'));
+                console.log(chalk.yellow('1. Vérifie que le numéro est correct (2250152611661)'));
+                console.log(chalk.yellow('2. Redémarre le bot'));
+                console.log(chalk.yellow('3. Attends 1 minute et réessaie'));
+            }
+        }, 3000); // Attendre 3 secondes avant de générer le code
+
+        // Gérer les messages (commandes)
         sock.ev.on('messages.upsert', async ({ messages }) => {
             for (const msg of messages) {
                 try {
                     if (!msg.message || msg.key.fromMe) continue;
-                    
-                    // Ici tu peux ajouter le traitement des commandes
-                    // Exemple simple:
-                    const text = msg.message.conversation || '';
+
+                    const text = msg.message.conversation || 
+                                msg.message.extendedTextMessage?.text || '';
+
                     if (text === '.ping') {
                         await sock.sendMessage(msg.key.remoteJid, { text: '🏓 Pong!' });
                     }
                     
+                    if (text === '.menu' || text === '.help') {
+                        await sock.sendMessage(msg.key.remoteJid, { 
+                            text: `╔══════════════════════╗
+║     CHICANO MD      ║
+╠══════════════════════╣
+║ 👤 Bot: Connecté
+║ 📱 Code: Dans les logs
+║ ⚡ Commandes:
+║   • .ping - Test
+║   • .menu - Menu
+╚══════════════════════╝`
+                        });
+                    }
                 } catch (e) {
-                    console.error('Erreur:', e);
+                    console.log('Erreur message:', e.message);
                 }
             }
         });
 
     } catch (error) {
-        console.error('❌ Erreur fatale:', error);
+        console.log(chalk.red('❌ Erreur fatale:'), error.message);
         setTimeout(startBot, 10000);
     }
 }
 
-// Démarrer
+// Démarrer le bot
 startBot();
 
 // Garder le processus actif
 setInterval(() => {
-    // Juste pour garder le processus en vie
-    const uptime = Math.floor((Date.now() - startTime) / 1000);
+    const uptime = process.uptime();
     const hours = Math.floor(uptime / 3600);
     const minutes = Math.floor((uptime % 3600) / 60);
-    const seconds = uptime % 60;
     
-    // Afficher l'uptime toutes les 5 minutes (pour voir que le bot tourne)
-    if (uptime % 300 === 0) {
-        console.log(chalk.blue(`⏱️ Uptime: ${hours}h ${minutes}m ${seconds}s`));
+    // Afficher l'uptime toutes les 5 minutes
+    if (Math.floor(uptime) % 300 === 0) {
+        console.log(chalk.blue(`⏱️ Uptime: ${hours}h ${minutes}m`));
     }
 }, 1000);
 
-// Gestion arrêt
+// Gérer l'arrêt
 process.on('SIGINT', () => {
     console.log(chalk.yellow('\n👋 Arrêt du bot...'));
-    process.exit();
-});
-
-process.on('SIGTERM', () => {
-    console.log(chalk.yellow('\n👋 Arrêt demandé...'));
     process.exit();
 });
