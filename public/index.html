@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHICANO MD - Connexion</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+            color: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .status {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .online {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .offline {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .pairing-section {
+            text-align: center;
+        }
+        .phone-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        select, input {
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        select {
+            width: 120px;
+        }
+        input {
+            flex: 1;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .code-display {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .code {
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 5px;
+            font-family: monospace;
+            background: #000;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .qr-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .qr-container img {
+            max-width: 250px;
+            border-radius: 10px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 30px;
+            text-align: center;
+        }
+        .stat-item {
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 CHICANO MD</h1>
+        
+        <div class="status">
+            <div>Statut: <span id="status" class="offline">Déconnecté</span></div>
+            <div id="bot-info"></div>
+        </div>
+
+        <div class="pairing-section">
+            <h2>📱 Connexion par code</h2>
+            <p>Entrez votre numéro WhatsApp</p>
+            
+            <div class="phone-input">
+                <select id="country">
+                    <option value="226">+226 (BF)</option>
+                    <option value="225">+225 (CI)</option>
+                    <option value="221">+221 (SN)</option>
+                </select>
+                <input type="text" id="phone" placeholder="70000000" maxlength="9">
+            </div>
+            
+            <button onclick="getPairingCode()">
+                🔑 Obtenir le code
+            </button>
+
+            <div id="codeDisplay" class="code-display hidden">
+                <h3>Votre code de pairage</h3>
+                <div class="code" id="pairingCode">XXXX-XXXX</div>
+                <button onclick="copyCode()">📋 Copier</button>
+            </div>
+        </div>
+
+        <div class="qr-container hidden" id="qrContainer">
+            <h3>Ou scannez le QR code</h3>
+            <div id="qrImage"></div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="statMsgs">0</div>
+                <div>Messages</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statCmds">0</div>
+                <div>Commandes</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="statUptime">0</div>
+                <div>Uptime</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        // Écouter les événements
+        socket.on('connect', () => {
+            console.log('Connecté au serveur');
+        });
+
+        socket.on('pairing-code', (data) => {
+            document.getElementById('codeDisplay').classList.remove('hidden');
+            document.getElementById('pairingCode').textContent = data.code;
+        });
+
+        socket.on('qr', (data) => {
+            document.getElementById('qrContainer').classList.remove('hidden');
+            document.getElementById('qrImage').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.qr)}">`;
+        });
+
+        socket.on('connected', () => {
+            document.getElementById('status').textContent = 'Connecté';
+            document.getElementById('status').className = 'online';
+        });
+
+        socket.on('stats', (data) => {
+            document.getElementById('statMsgs').textContent = data.messages || 0;
+            document.getElementById('statCmds').textContent = data.commands || 0;
+            
+            const uptime = formatUptime(data.uptime);
+            document.getElementById('statUptime').textContent = uptime.split(' ')[0];
+        });
+
+        // Obtenir code de pairage
+        async function getPairingCode() {
+            const country = document.getElementById('country').value;
+            const phone = document.getElementById('phone').value;
+            
+            if (!phone) {
+                alert('Entrez votre numéro');
+                return;
+            }
+            
+            const fullNumber = country + phone;
+            
+            const response = await fetch('/api/pair', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ phoneNumber: fullNumber })
+            });
+            
+            const data = await response.json();
+            if (data.error) {
+                alert('Erreur: ' + data.error);
+            }
+        }
+
+        // Copier le code
+        function copyCode() {
+            const code = document.getElementById('pairingCode').textContent;
+            navigator.clipboard.writeText(code);
+            alert('Code copié!');
+        }
+
+        // Formater uptime
+        function formatUptime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${hours}h ${minutes}m ${secs}s`;
+        }
+
+        // Vérifier statut
+        async function checkStatus() {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+            
+            if (data.status === 'connected') {
+                document.getElementById('status').textContent = 'Connecté';
+                document.getElementById('status').className = 'online';
+            }
+        }
+        
+        checkStatus();
+        setInterval(checkStatus, 5000);
+    </script>
+</body>
+  </html>
